@@ -139,3 +139,14 @@ and skill workflows.
    - `git tag 0.68` or `git tag pykaos-0.5.3`
    - `git push --tags`
 9. GitHub Actions handles the release after tags are pushed.
+
+## Important: Fork-Only Workflow
+
+**This is a fork of the original repository.** All development work must be done on **this fork only** (`yumesha/kimi-cli`), NOT on the upstream repository (`MoonshotAI/kimi-cli`).
+
+- ✅ DO: Create branches, PRs, tags, and releases on `origin` (this fork)
+- ❌ DO NOT: Create PRs on `upstream` (MoonshotAI/kimi-cli)
+- ❌ DO NOT: Push changes to `upstream`
+- When releasing, always use `git push origin <tag>` not `git push upstream <tag>`
+
+The fork maintains its own release cycle independently from upstream.
