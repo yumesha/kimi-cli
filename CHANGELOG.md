@@ -11,6 +11,14 @@ Only write entries that are worth mentioning to users.
 
 ## Unreleased
 
+## 1.14.6 (2026-03-01)
+
+- Add session logging to `~/.kimi/sessions/<hash>/<session>/logs/` directory
+  - Logs include session start/end events, user prompts, thinking content, tool calls, and approval requests
+  - Logs are stored in JSON Lines format for easy parsing
+- Fix duplicate bottom toolbar artifacts when terminal is resized (e.g., on Hyprland fullscreen toggle)
+  - Add SIGWINCH signal handler to trigger proper redraw
+
 ## 1.14.5 (2026-02-19)
 
 - Privacy: Anonymize telemetry headers sent during OAuth login and API requests
