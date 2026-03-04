@@ -730,6 +730,56 @@ def logout(
         raise typer.Exit(code=1)
 
 
+@cli.command(name="refresh")
+def auth_refresh(
+    json: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit OAuth events as JSON lines.",
+    ),
+) -> None:
+    """Refresh Kimi Code OAuth tokens.
+
+    This command uses the stored refresh_token to obtain a new access_token,
+    extending the session validity without requiring browser authentication.
+
+    The credentials are stored in ~/.kimi/credentials/kimi-code.json
+    """
+    from rich.console import Console
+
+    from kimi_cli.auth.oauth import refresh_kimi_code_tokens
+    from kimi_cli.config import load_config
+
+    async def _run() -> bool:
+        ok = True
+        if json:
+            async for event in refresh_kimi_code_tokens(load_config()):
+                typer.echo(event.json)
+                if event.type == "error":
+                    ok = False
+            return ok
+
+        console = Console()
+        async for event in refresh_kimi_code_tokens(load_config()):
+            match event.type:
+                case "error":
+                    style = "red"
+                case "success":
+                    style = "green"
+                case "info":
+                    style = "blue"
+                case _:
+                    style = None
+            console.print(event.message, markup=False, style=style)
+            if event.type == "error":
+                ok = False
+        return ok
+
+    ok = asyncio.run(_run())
+    if not ok:
+        raise typer.Exit(code=1)
+
+
 @cli.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 def term(
     ctx: typer.Context,

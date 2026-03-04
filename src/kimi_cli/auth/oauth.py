@@ -519,6 +519,114 @@ async def logout_kimi_code(config: Config) -> AsyncIterator[OAuthEvent]:
     return
 
 
+async def refresh_kimi_code_tokens(
+    config: Config,
+) -> AsyncIterator[OAuthEvent]:
+    """Refresh Kimi Code OAuth tokens using the refresh_token.
+
+    This function loads the existing tokens from storage, checks if a refresh
+    is needed (token expires within 5 minutes or has already expired), and
+    uses the refresh_token to obtain a new access_token.
+
+    If the token is still valid and not within the refresh threshold,
+    no refresh is performed.
+    """
+    if not config.is_from_default_location:
+        yield OAuthEvent(
+            "error",
+            "Token refresh requires the default config file; "
+            "restart without --config/--config-file.",
+        )
+        return
+
+    # Find the OAuth reference for kimi-code
+    from kimi_cli.auth.platforms import managed_provider_key
+
+    provider_key = managed_provider_key(KIMI_CODE_PLATFORM_ID)
+    provider = config.providers.get(provider_key)
+
+    oauth_ref: OAuthRef | None = None
+    if provider and provider.oauth:
+        oauth_ref = provider.oauth
+    else:
+        # Check services
+        for service in (
+            config.services.moonshot_search,
+            config.services.moonshot_fetch,
+        ):
+            if service and service.oauth and service.oauth.key == KIMI_CODE_OAUTH_KEY:
+                oauth_ref = service.oauth
+                break
+
+    if oauth_ref is None:
+        yield OAuthEvent("error", "No Kimi Code OAuth credentials found. Run `kimi login` first.")
+        return
+
+    # Load current tokens
+    current_token = load_tokens(oauth_ref)
+    if current_token is None:
+        yield OAuthEvent(
+            "error",
+            "No stored tokens found. Credentials file may be missing. Run `kimi login`.",
+        )
+        return
+
+    if not current_token.refresh_token:
+        yield OAuthEvent(
+            "error", "No refresh_token available. Run `kimi login` to re-authenticate."
+        )
+        return
+
+    # Check if refresh is needed
+    now = time.time()
+    expires_in = current_token.expires_at - now if current_token.expires_at else 0
+
+    # Always allow refresh, but inform user if token is still valid
+    if expires_in > REFRESH_THRESHOLD_SECONDS:
+        yield OAuthEvent(
+            "info",
+            f"Token is still valid for {int(expires_in // 60)} minutes. Refreshing anyway...",
+        )
+    elif expires_in > 0:
+        yield OAuthEvent(
+            "info",
+            f"Token expires in {int(expires_in)} seconds. Refreshing...",
+        )
+    else:
+        yield OAuthEvent(
+            "info",
+            f"Token expired {int(-expires_in)} seconds ago. Refreshing...",
+        )
+
+    # Perform the refresh
+    try:
+        new_token = await refresh_token(current_token.refresh_token)
+    except OAuthUnauthorized as exc:
+        yield OAuthEvent("error", f"Token refresh unauthorized: {exc}")
+        return
+    except OAuthError as exc:
+        yield OAuthEvent("error", f"Token refresh failed: {exc}")
+        return
+    except Exception as exc:
+        yield OAuthEvent("error", f"Unexpected error during token refresh: {exc}")
+        return
+
+    # Save the new tokens
+    save_tokens(oauth_ref, new_token)
+
+    # Calculate new expiry for display
+    new_expires_in = int(new_token.expires_at - time.time())
+    yield OAuthEvent(
+        "success",
+        f"Token refreshed successfully. New token valid for {new_expires_in // 60} minutes.",
+        data={
+            "expires_at": new_token.expires_at,
+            "expires_in": new_expires_in,
+        },
+    )
+    return
+
+
 class OAuthManager:
     def __init__(self, config: Config) -> None:
         self._config = config
