@@ -38,10 +38,9 @@ update_changelog: |md
 
 bump_version: |md
   Update pyproject.toml version:
-  - Follow minor-bump-only versioning (MAJOR.MINOR.0)
-  - Bump minor for any change (features, fixes, etc.)
-  - Patch is always 0
-  - Example: 1.14.5 → 1.15.0
+  - Keep MAJOR.MINOR fixed (e.g., 1.14)
+  - Bump PATCH for any change (features, fixes, etc.)
+  - Example: 1.14.10 → 1.14.11
 |
 
 uv_sync: "Run `uv sync` to update uv.lock."
@@ -78,14 +77,14 @@ Types:
 - `test`: Test changes
 - `chore`: Build/tooling changes
 
-### Versioning Policy (Minor-bump-only)
+### Versioning Policy (Patch-bump-only)
 - Format: `MAJOR.MINOR.PATCH`
-- **PATCH is always 0** - never bump it
-- **MINOR is bumped for any change**: features, bug fixes, refactors, docs, etc.
-- **MAJOR only changes by explicit manual decision**
+- **MAJOR.MINOR stays fixed** (e.g., `1.14`)
+- **PATCH is bumped for any change**: features, bug fixes, refactors, docs, etc.
+- **MAJOR/MINOR only changes by explicit manual decision**
 - Examples:
-  - `1.14.5` → `1.15.0` (normal release)
-  - `1.14.5` → `2.0.0` (only if explicitly requested)
+  - `1.14.10` → `1.14.11` (normal release)
+  - `1.14.10` → `1.15.0` (only if explicitly requested)
 
 ### Files to Update
 1. Source files (implementation)
