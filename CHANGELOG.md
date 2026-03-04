@@ -11,6 +11,14 @@ Only write entries that are worth mentioning to users.
 
 ## Unreleased
 
+## 1.14.8 (2026-03-04)
+
+- Improve `kimi refresh` command for 24/7 server deployments:
+  - Add `--force` flag to always refresh token even if not near expiry
+  - Add `--warn-if-expires-within <seconds>` flag for proactive refresh
+  - Enhance `--json` output with `previous_expiry`, `new_expiry`, `extended_by_seconds`
+  - Non-zero exit code on failure for better scripting support
+
 ## 1.14.7 (2026-03-04)
 
 - Add `kimi refresh` command to refresh OAuth tokens without browser authentication
