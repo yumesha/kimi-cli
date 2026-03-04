@@ -11,6 +11,11 @@ Only write entries that are worth mentioning to users.
 
 ## Unreleased
 
+## 1.14.7 (2026-03-04)
+
+- Add `kimi refresh` command to refresh OAuth tokens without browser authentication
+- Uses stored refresh_token to obtain new access_token for automated/headless environments
+
 ## 1.14.5 (2026-02-19)
 
 - Privacy: Anonymize telemetry headers sent during OAuth login and API requests
