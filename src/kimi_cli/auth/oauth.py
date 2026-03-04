@@ -8,6 +8,7 @@ import webbrowser
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
@@ -521,6 +522,9 @@ async def logout_kimi_code(config: Config) -> AsyncIterator[OAuthEvent]:
 
 async def refresh_kimi_code_tokens(
     config: Config,
+    *,
+    force: bool = False,
+    warn_if_expires_within: int | None = None,
 ) -> AsyncIterator[OAuthEvent]:
     """Refresh Kimi Code OAuth tokens using the refresh_token.
 
@@ -528,8 +532,15 @@ async def refresh_kimi_code_tokens(
     is needed (token expires within 5 minutes or has already expired), and
     uses the refresh_token to obtain a new access_token.
 
-    If the token is still valid and not within the refresh threshold,
-    no refresh is performed.
+    Args:
+        config: The configuration object.
+        force: If True, always refresh the token even if it's not near expiry.
+        warn_if_expires_within: If set, warn if the token expires within this
+            many seconds. If the token is within this threshold, a refresh
+            will be attempted.
+
+    If the token is still valid and not within the refresh threshold (and
+    force is False), no refresh is performed.
     """
     if not config.is_from_default_location:
         yield OAuthEvent(
@@ -580,8 +591,52 @@ async def refresh_kimi_code_tokens(
     # Check if refresh is needed
     now = time.time()
     expires_in = current_token.expires_at - now if current_token.expires_at else 0
+    previous_expires_at = current_token.expires_at
 
-    # Always allow refresh, but inform user if token is still valid
+    # Determine if we should refresh based on force flag and expiry
+    needs_refresh = force
+
+    if (
+        not needs_refresh
+        and warn_if_expires_within is not None
+        and expires_in <= warn_if_expires_within
+    ):
+        expiry_str = datetime.fromtimestamp(current_token.expires_at, tz=UTC).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        if expires_in > 0:
+            yield OAuthEvent(
+                "info",
+                f"Token expires in {int(expires_in)} seconds ({expiry_str}), attempting refresh...",
+            )
+        else:
+            yield OAuthEvent(
+                "info",
+                f"Token expired {int(-expires_in)} seconds ago ({expiry_str}), "
+                "attempting refresh...",
+            )
+        needs_refresh = True
+
+    if not needs_refresh and expires_in > REFRESH_THRESHOLD_SECONDS:
+        # Token is still valid and not within threshold, skip refresh
+        expiry_str = datetime.fromtimestamp(current_token.expires_at, tz=UTC).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        yield OAuthEvent(
+            "success",
+            f"Token is still valid for {int(expires_in // 60)} minutes. "
+            f"Use --force to refresh anyway.",
+            data={
+                "success": True,
+                "refreshed": False,
+                "previous_expiry": expiry_str,
+                "new_expiry": expiry_str,
+                "extended_by_seconds": 0,
+            },
+        )
+        return
+
+    # Inform user if token is still valid but we're refreshing anyway
     if expires_in > REFRESH_THRESHOLD_SECONDS:
         yield OAuthEvent(
             "info",
@@ -616,10 +671,24 @@ async def refresh_kimi_code_tokens(
 
     # Calculate new expiry for display
     new_expires_in = int(new_token.expires_at - time.time())
+    extended_by = int(new_token.expires_at - previous_expires_at)
+
+    previous_expiry_str = datetime.fromtimestamp(previous_expires_at, tz=UTC).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+    new_expiry_str = datetime.fromtimestamp(new_token.expires_at, tz=UTC).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+
     yield OAuthEvent(
         "success",
         f"Token refreshed successfully. New token valid for {new_expires_in // 60} minutes.",
         data={
+            "success": True,
+            "refreshed": True,
+            "previous_expiry": previous_expiry_str,
+            "new_expiry": new_expiry_str,
+            "extended_by_seconds": extended_by,
             "expires_at": new_token.expires_at,
             "expires_in": new_expires_in,
         },

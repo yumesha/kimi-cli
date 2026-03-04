@@ -737,6 +737,18 @@ def auth_refresh(
         "--json",
         help="Emit OAuth events as JSON lines.",
     ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Force refresh even if the token is not near expiry.",
+    ),
+    warn_if_expires_within: int | None = typer.Option(
+        None,
+        "--warn-if-expires-within",
+        "-w",
+        help="Warn and refresh if the token expires within this many seconds.",
+    ),
 ) -> None:
     """Refresh Kimi Code OAuth tokens.
 
@@ -752,15 +764,24 @@ def auth_refresh(
 
     async def _run() -> bool:
         ok = True
+        config = load_config()
         if json:
-            async for event in refresh_kimi_code_tokens(load_config()):
+            async for event in refresh_kimi_code_tokens(
+                config,
+                force=force,
+                warn_if_expires_within=warn_if_expires_within,
+            ):
                 typer.echo(event.json)
                 if event.type == "error":
                     ok = False
             return ok
 
         console = Console()
-        async for event in refresh_kimi_code_tokens(load_config()):
+        async for event in refresh_kimi_code_tokens(
+            config,
+            force=force,
+            warn_if_expires_within=warn_if_expires_within,
+        ):
             match event.type:
                 case "error":
                     style = "red"
